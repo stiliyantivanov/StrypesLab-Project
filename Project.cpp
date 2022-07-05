@@ -130,6 +130,11 @@ void walletInfo(const System& system, const unsigned walletId) {
 }
 
 size_t executedOrders(const System& system, const unsigned walletId) {
+    for (size_t i = 0; i < system.wallets.count; i++) {
+        if (system.wallets.items[i].id == walletId) {
+            return system.wallets.executedOrders[i];
+        }
+    }
     return 0;
 }
 
@@ -229,6 +234,7 @@ void executeOrders(System& system) {
                         findWallet(system, system.orders.items[i].walletId)->fiatMoney -= sellCoins * EXCHANGE_RATE;
                         findWallet(system, system.orders.items[j].walletId)->fiatMoney += sellCoins * EXCHANGE_RATE;
                         system.orders.executed[j] = true;
+                        
                     }
                     else {
                         transfer(system, system.orders.items[j].walletId, system.orders.items[i].walletId,
@@ -313,11 +319,15 @@ bool addOrder(System& system, const unsigned walletId, const Order::Type type, c
 
 void resizeWalletContainer(System& system) {
     Wallet* newWallets = new (std::nothrow) Wallet[system.wallets.capacity *= 2];
+    size_t* newExecutedOrders = new (std::nothrow) size_t[system.wallets.capacity];
     for (size_t i = 0; i < system.wallets.count; i++) {
         newWallets[i] = system.wallets.items[i];
+        newExecutedOrders[i] = system.wallets.executedOrders[i];
     }
     delete[] system.wallets.items;
+    delete[] system.wallets.executedOrders;
     system.wallets.items = newWallets;
+    system.wallets.executedOrders = newExecutedOrders;
 }
 
 void resizeTransactionContainer(System& system) {
@@ -346,6 +356,7 @@ void quit(const System& system) {
     std::ofstream walletsFile(WALLETS_FILENAME, std::ios::binary);
     walletsFile.write((const char*)&system.wallets.count, sizeof(size_t));
     walletsFile.write((const char*)&system.wallets.items, system.wallets.count * sizeof(Wallet));
+    walletsFile.write((const char*)&system.wallets.executedOrders, system.wallets.count * sizeof(size_t));
     walletsFile.close();
 
     std::ofstream transactionsFile(TRANSACTIONS_FILENAME, std::ios::binary);
@@ -366,12 +377,15 @@ void loadSystem(System& system) {
         system.wallets.capacity = system.wallets.count;
         system.wallets.items = new (std::nothrow) Wallet[system.wallets.capacity];
         walletsFile.read((char*)&system.wallets.items, system.wallets.count * sizeof(Wallet));
+        system.wallets.executedOrders = new (std::nothrow) size_t[system.wallets.capacity];
+        walletsFile.read((char*)&system.wallets.executedOrders, system.wallets.count * sizeof(size_t));
         walletsFile.close();
     }
     else {
         system.wallets.capacity = INITIAL_CAPACITY;
         system.wallets.count = 0;
         system.wallets.items = new (std::nothrow) Wallet[INITIAL_CAPACITY];
+        system.wallets.executedOrders = new (std::nothrow) size_t[INITIAL_CAPACITY];
     }
 
     std::ifstream transactionsFile(TRANSACTIONS_FILENAME, std::ios::binary);
@@ -402,6 +416,9 @@ void loadSystem(System& system) {
         system.orders.items = new (std::nothrow) Order[INITIAL_CAPACITY];
     }
     system.orders.executed = new (std::nothrow) bool[system.orders.capacity];
+    for (size_t i = 0; i < system.orders.count; i++) {
+        system.orders.executed[i] = false;
+    }
 }
 
 int main()
