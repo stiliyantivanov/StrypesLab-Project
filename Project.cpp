@@ -3,18 +3,11 @@
 #include <fstream>
 #include <ctime>
 
-const int SYSTEM_WALLET_ID = 4294967295;
+const long long SYSTEM_WALLET_ID = 4294967295;
 const size_t INITIAL_CAPACITY = 2;
 const int EXCHANGE_RATE = 375;
 const int RICHEST_USERS_COUNT = 10;
-
-const char* COMMANDS[1024] = {
-    "List commands",
-    "Create wallet",
-    "Add order",
-    "Transfer",
-    "Quit"
-};
+const size_t MAX_INPUT_LENGTH = 1024;
 
 const char WALLETS_FILENAME[] = "wallets.dat";
 const char TRANSACTIONS_FILENAME[] = "transactions.dat";
@@ -80,7 +73,10 @@ bool addWallet(System& system, const double fiatMoney, const char name[]) {
     if (strlen(name) <= 255) {
         Wallet wallet;
         strcpy(wallet.owner, name);
-        wallet.id = generateId();
+        do {
+            wallet.id = generateId();
+        } 
+        while (findWallet(system, wallet.id));
         wallet.fiatMoney = fiatMoney;
 
         if (system.wallets.count == system.wallets.capacity) {
@@ -426,7 +422,69 @@ int main()
     System system;
     loadSystem(system);
 
+    char command[MAX_INPUT_LENGTH];
 
+    do {
+        std::cin >> command;
+        if (strcmp(command, "add-wallet")) {
+            double fiatMoney;
+            char name[MAX_INPUT_LENGTH];
+            std::cin >> fiatMoney >> name;
+            if (addWallet(system, fiatMoney, name)) {
+                std::cout << "Successfully added wallet" << std::endl;
+            }
+            else {
+                std::cout << "Could not add wallet" << std::endl;
+            }
+        }
+        else if (strcmp(command, "make-order")) {
+            char type[MAX_INPUT_LENGTH];
+            double grnCoins;
+            unsigned walletId;
+            std::cin >> type >> grnCoins >> walletId;
+            if (strcmp(type, "buy")) {
+                if (addOrder(system, walletId, Order::Type::BUY, grnCoins)) {
+                    std::cout << "Successfully added order" << std::endl;
+                }
+                else {
+                    std::cout << "Could not add order" << std::endl;
+                }
+            }
+            else if (strcmp(type, "sell")) {
+                if (addOrder(system, walletId, Order::Type::SELL, grnCoins)) {
+                    std::cout << "Successfully added order" << std::endl;
+                }
+                else {
+                    std::cout << "Could not add order" << std::endl;
+                }
+            }
+            else {
+                std::cout << "Invalid type of order" << std::endl;
+            }
+        }
+        else if (strcmp(command, "transfer")) {
+            unsigned senderId, receiverId;
+            double grnCoins;
+            std::cin >> senderId >> receiverId >> grnCoins;
+            if (transfer(system, senderId, receiverId, grnCoins)) {
+                std::cout << "Successful transfer" << std::endl;
+            }
+            else {
+                std::cout << "Unsuccessful transfer" << std::endl;
+            }
+        }
+        else if (strcmp(command, "wallet-info")) {
+            unsigned walletId;
+            std::cin >> walletId;
+            walletInfo(system, walletId);
+        }
+        else if (strcmp(command, "attract-investors")) {
+            attractInvestors(system);
+        }
+        else if (strcmp(command, "quit")) {
+            quit(system);
+        }
+    } while (strcmp(command, "quit") != 0);
 
     return 0;
 }
